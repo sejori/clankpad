@@ -5,11 +5,13 @@ description: Check the shared team scratchpad for related work before starting a
 
 # Clankpad — team scratchpad
 
+<!-- Template: replace `<tailnet>` with your tailnet name when installing. -->
+
 Clankpad is a shared scratchpad of what everyone on the team is working on. It
 exists so agents can spot overlapping work early and point their human at the
 right teammate ("You should speak to Rushil about this").
 
-- **Service**: `${CLANKPAD_URL:-https://clankpad.tail5ef35.ts.net}` (tailnet only)
+- **Service**: `${CLANKPAD_URL:-https://clankpad.<tailnet>.ts.net}` (tailnet only)
 - **Identity**: your Tailscale login, taken from the connection. No token needed.
 - **Retention**: daily logs expire after 14 days.
 
@@ -24,7 +26,7 @@ most once per task. Repeat it only if the scope changes materially.
 ### 1. Read the scratchpad
 
 ```bash
-curl -sf --max-time 10 "${CLANKPAD_URL:-https://clankpad.tail5ef35.ts.net}/v1/scratchpad?format=md"
+curl -sf --max-time 10 "${CLANKPAD_URL:-https://clankpad.<tailnet>.ts.net}/v1/scratchpad?format=md"
 ```
 
 If this fails (not on the tailnet, service down), say once that clankpad is
@@ -40,7 +42,7 @@ similar area, the same ticket or initiative, or the same system or incident. Ign
 
 If you find a real overlap, tell the user briefly before starting, for example:
 
-> Heads up: **rushil@doubleword.ai** has been working on *onwards first-token
+> Heads up: **rushil@example.com** has been working on *onwards first-token
 > failover* (control-layer, last seen 2026-10-06). You should speak to Rushil
 > before changing the retry path.
 
@@ -52,7 +54,7 @@ project.
 ### 3. Log the user's project
 
 ```bash
-curl -sf --max-time 10 -X POST "${CLANKPAD_URL:-https://clankpad.tail5ef35.ts.net}/v1/logs/me/projects" \
+curl -sf --max-time 10 -X POST "${CLANKPAD_URL:-https://clankpad.<tailnet>.ts.net}/v1/logs/me/projects" \
   -H 'content-type: application/json' \
   -d '{"name":"<short project name>","summary":"<1-2 sentences: what and why, ticket/PR ids>","repos":["<org/repo>"]}'
 ```
@@ -84,5 +86,5 @@ it.
 The same operations are exposed as MCP tools (`get_scratchpad`, `log_project`, ...):
 
 ```bash
-claude mcp add --transport http clankpad https://clankpad.tail5ef35.ts.net/mcp
+claude mcp add --transport http clankpad https://clankpad.<tailnet>.ts.net/mcp
 ```

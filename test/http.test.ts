@@ -33,42 +33,42 @@ test("rejects callers without a tailscale identity", async () => {
 });
 
 test("log, read, scratchpad, remove", async () => {
-  const who = await (await fetch(`${base}/v1/whoami`, as("Seb@Doubleword.ai"))).json();
-  assert.deepEqual(who, { user: "seb@doubleword.ai" });
+  const who = await (await fetch(`${base}/v1/whoami`, as("Seb@Example.com"))).json();
+  assert.deepEqual(who, { user: "seb@example.com" });
 
-  const bad = await fetch(`${base}/v1/logs/me/projects`, as("seb@doubleword.ai", { method: "POST", body: JSON.stringify({ summary: "x" }) }));
+  const bad = await fetch(`${base}/v1/logs/me/projects`, as("seb@example.com", { method: "POST", body: JSON.stringify({ summary: "x" }) }));
   assert.equal(bad.status, 400);
 
   const post = await fetch(
     `${base}/v1/logs/me/projects`,
-    as("seb@doubleword.ai", { method: "POST", body: JSON.stringify({ name: "Clankpad MVP", summary: "building it", repos: ["sejori/clankpad"] }) }),
+    as("seb@example.com", { method: "POST", body: JSON.stringify({ name: "Clankpad MVP", summary: "building it", repos: ["sejori/clankpad"] }) }),
   );
   assert.equal(post.status, 200);
   const log = await post.json();
   assert.equal(log.projects[0].slug, "clankpad-mvp");
 
-  await fetch(`${base}/v1/logs/me/projects`, as("fergus@doubleword.ai", { method: "POST", body: JSON.stringify({ name: "everything" }) }));
+  await fetch(`${base}/v1/logs/me/projects`, as("fergus@example.com", { method: "POST", body: JSON.stringify({ name: "everything" }) }));
 
-  const rebuilt = await (await fetch(`${base}/v1/scratchpad/rebuild`, as("seb@doubleword.ai", { method: "POST" }))).json();
+  const rebuilt = await (await fetch(`${base}/v1/scratchpad/rebuild`, as("seb@example.com", { method: "POST" }))).json();
   assert.equal(rebuilt.model, null);
-  const md = await (await fetch(`${base}/v1/scratchpad?format=md`, as("rushil@doubleword.ai"))).text();
-  assert.match(md, /## fergus@doubleword\.ai/);
+  const md = await (await fetch(`${base}/v1/scratchpad?format=md`, as("rushil@example.com"))).text();
+  assert.match(md, /## fergus@example\.com/);
   assert.match(md, /Clankpad MVP/);
 
-  const activity = await (await fetch(`${base}/v1/activity?days=1`, as("seb@doubleword.ai"))).json();
+  const activity = await (await fetch(`${base}/v1/activity?days=1`, as("seb@example.com"))).json();
   assert.equal(activity.length, 2);
 
-  const del = await fetch(`${base}/v1/logs/me/projects/Clankpad%20MVP`, as("seb@doubleword.ai", { method: "DELETE" }));
+  const del = await fetch(`${base}/v1/logs/me/projects/Clankpad%20MVP`, as("seb@example.com", { method: "DELETE" }));
   assert.equal(del.status, 200);
   assert.equal((await del.json()).log.projects.length, 0);
-  assert.equal((await fetch(`${base}/v1/logs/me/projects/nope`, as("seb@doubleword.ai", { method: "DELETE" }))).status, 404);
+  assert.equal((await fetch(`${base}/v1/logs/me/projects/nope`, as("seb@example.com", { method: "DELETE" }))).status, 404);
 });
 
 test("MCP endpoint lists and calls tools as the tailscale user", async () => {
   const rpc = async (method: string, params: unknown, id = 1) => {
     const res = await fetch(
       `${base}/mcp`,
-      as("rushil@doubleword.ai", {
+      as("rushil@example.com", {
         method: "POST",
         headers: { accept: "application/json, text/event-stream" },
         body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
@@ -88,5 +88,5 @@ test("MCP endpoint lists and calls tools as the tailscale user", async () => {
   );
 
   const logged = await rpc("tools/call", { name: "log_project", arguments: { name: "routing", summary: "x" } }, 3);
-  assert.match(logged.result.content[0].text, /"user": "rushil@doubleword.ai"/);
+  assert.match(logged.result.content[0].text, /"user": "rushil@example.com"/);
 });
