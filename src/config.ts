@@ -12,11 +12,15 @@ export interface Config {
     baseUrl: string;
     apiKey: string | undefined;
     model: string;
+    /** Sent as reasoning_effort when set; "" disables. */
+    reasoningEffort: string;
     timeoutMs: number;
     maxTokens: number;
   };
   rebuildDebounceMs: number;
   rebuildIntervalMs: number;
+  /** Hard ceiling on scratchpad size; it is read into every agent's context. */
+  scratchpadMaxChars: number;
 }
 
 function int(name: string, fallback: number): number {
@@ -47,12 +51,19 @@ export function loadConfig(): Config {
     llm: {
       baseUrl: (process.env.LLM_BASE_URL ?? "https://api.doubleword.ai/v1").replace(/\/+$/, ""),
       apiKey: process.env.LLM_API_KEY || process.env.DOUBLEWORD_API_KEY || undefined,
-      model: process.env.LLM_MODEL ?? "Qwen/Qwen3.5-35B-A3B-FP8",
-      timeoutMs: int("LLM_TIMEOUT_MS", 120_000),
-      maxTokens: int("LLM_MAX_TOKENS", 4096),
+      model: process.env.LLM_MODEL ?? "deepseek-ai/DeepSeek-V4.1-Flash",
+      // With reasoning on, the model burns its token budget counting characters
+      // (observed: 15k reasoning tokens, 50-170s, finish_reason=length at 40 users).
+      reasoningEffort: process.env.LLM_REASONING_EFFORT ?? "none",
+      // Rebuilds are background work; at ~40 users a call can take ~2 min.
+      timeoutMs: int("LLM_TIMEOUT_MS", 300_000),
+      // Reasoning models spend part of this on thinking.
+      maxTokens: int("LLM_MAX_TOKENS", 16384),
     },
     rebuildDebounceMs: int("CLANKPAD_REBUILD_DEBOUNCE_MS", 5_000),
     // Periodic rebuild picks up TTL expiry and day rollover; skipped when inputs are unchanged.
     rebuildIntervalMs: int("CLANKPAD_REBUILD_INTERVAL_MS", 60 * 60 * 1000),
+    // ~1.5k tokens.
+    scratchpadMaxChars: int("CLANKPAD_SCRATCHPAD_MAX_CHARS", 6000),
   };
 }

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Aggregator } from "./aggregator.ts";
-import { buildActivity } from "./activity.ts";
+import { buildActivity, renderMarkdown } from "./activity.ts";
 import type { Config } from "./config.ts";
 import type { Store } from "./store.ts";
 import type { DailyLog, Scratchpad, UserActivity } from "./types.ts";
@@ -20,7 +20,7 @@ export const ProjectInput = z.object({
     .array(z.string().trim().min(1).max(200))
     .max(10)
     .default([])
-    .describe("Repositories touched, e.g. ['doublewordai/control-layer']"),
+    .describe("Repositories touched, e.g. ['acme/gateway']"),
 });
 export type ProjectInput = z.input<typeof ProjectInput>;
 
@@ -39,19 +39,30 @@ export class Service {
   }
 
   async scratchpad(): Promise<Scratchpad> {
-    return (await this.store.getScratchpad()) ?? (await this.aggregator.rebuildNow());
+    const stored = await this.store.getScratchpad();
+    if (stored) return stored;
+    // Cold start: don't make the caller wait on the LLM. Serve the deterministic
+    // render now; the background rebuild will replace it.
+    this.aggregator.trigger(0);
+    const now = this.now();
+    const markdown = renderMarkdown(await this.activity(), this.cfg.scratchpadMaxChars, today(now));
+    return { markdown, generatedAt: now.toISOString(), model: null, mode: "deterministic", digest: "", chars: markdown.length };
   }
 
   async rebuild(): Promise<Scratchpad> {
     return this.aggregator.rebuildNow(true);
   }
 
-  async activity(days = this.cfg.retentionDays): Promise<UserActivity[]> {
-    const d = Math.min(Math.max(1, Math.floor(days)), this.cfg.retentionDays);
-    return buildActivity(await this.store.listLogs(daysAgo(d - 1)));
+  private now() {
+    return this.aggregator.clock();
   }
 
-  async myLog(user: string, date = today()): Promise<DailyLog> {
+  async activity(days = this.cfg.retentionDays): Promise<UserActivity[]> {
+    const d = Math.min(Math.max(1, Math.floor(days)), this.cfg.retentionDays);
+    return buildActivity(await this.store.listLogs(daysAgo(d - 1, this.now())));
+  }
+
+  async myLog(user: string, date = today(this.now())): Promise<DailyLog> {
     if (!DATE_RE.test(date)) throw new ValidationError("date must be YYYY-MM-DD");
     return this.store.getLog(user, date);
   }
@@ -60,7 +71,8 @@ export class Service {
     const parsed = ProjectInput.safeParse(input);
     if (!parsed.success) throw new ValidationError(z.prettifyError(parsed.error));
     const p = parsed.data;
-    const date = today();
+    const now = this.now();
+    const date = today(now);
     const slug = slugify(p.name);
     const current = await this.store.getLog(user, date);
     if (!current.projects.some((e) => e.slug === slug) && current.projects.length >= MAX_PROJECTS_PER_DAY) {
@@ -71,14 +83,14 @@ export class Service {
       name: p.name,
       summary: p.summary,
       repos: [...new Set(p.repos)],
-      updatedAt: new Date().toISOString(),
+      updatedAt: now.toISOString(),
     });
     this.aggregator.trigger();
     return this.store.getLog(user, date);
   }
 
   async removeProject(user: string, nameOrSlug: string): Promise<{ removed: boolean; log: DailyLog }> {
-    const date = today();
+    const date = today(this.now());
     const removed = await this.store.removeProject(user, date, slugify(nameOrSlug));
     if (removed) this.aggregator.trigger();
     return { removed, log: await this.store.getLog(user, date) };

@@ -1,4 +1,4 @@
-import { buildActivity, digestActivity, renderMarkdown } from "./activity.ts";
+import { buildActivity, digestActivity, extractOverlaps, renderHybrid, renderMarkdown } from "./activity.ts";
 import type { Config } from "./config.ts";
 import { summarise } from "./llm.ts";
 import type { Store } from "./store.ts";
@@ -6,6 +6,12 @@ import type { Scratchpad } from "./types.ts";
 import { daysAgo, today } from "./util.ts";
 
 type Summariser = typeof summarise;
+
+export interface AggregatorOptions {
+  log?: (msg: string, extra?: Record<string, unknown>) => void;
+  summariser?: Summariser;
+  clock?: () => Date;
+}
 
 /**
  * Rebuilds the team scratchpad from all daily logs.
@@ -26,12 +32,14 @@ export class Aggregator {
   private readonly cfg: Config;
   private readonly log: (msg: string, extra?: Record<string, unknown>) => void;
   private readonly summariser: Summariser;
+  readonly clock: () => Date;
 
-  constructor(store: Store, cfg: Config, log = defaultLog, summariser: Summariser = summarise) {
+  constructor(store: Store, cfg: Config, opts: AggregatorOptions = {}) {
     this.store = store;
     this.cfg = cfg;
-    this.log = log;
-    this.summariser = summariser;
+    this.log = opts.log ?? defaultLog;
+    this.summariser = opts.summariser ?? summarise;
+    this.clock = opts.clock ?? (() => new Date());
   }
 
   start() {
@@ -84,8 +92,9 @@ export class Aggregator {
   }
 
   private async rebuild(force: boolean) {
-    const date = today();
-    const logs = await this.store.listLogs(daysAgo(this.cfg.retentionDays - 1));
+    const now = this.clock();
+    const date = today(now);
+    const logs = await this.store.listLogs(daysAgo(this.cfg.retentionDays - 1, now));
     const activity = buildActivity(logs);
     // Day rollover changes staleness wording, so it is part of the digest.
     const digest = `${date}:${digestActivity(activity)}`;
@@ -94,27 +103,61 @@ export class Aggregator {
     if (!force && existing?.digest === digest && !existing.error) return;
 
     const started = Date.now();
+    const maxChars = this.cfg.scratchpadMaxChars;
+    const base = { generatedAt: now.toISOString(), digest };
+    const deterministic = (error?: string): Scratchpad => {
+      const markdown = renderMarkdown(activity, maxChars, date);
+      return { ...base, markdown, model: null, mode: "deterministic", chars: markdown.length, ...(error ? { error } : {}) };
+    };
+
     let scratchpad: Scratchpad;
+    let attempts = 0;
     if (activity.length === 0 || !this.cfg.llm.apiKey) {
-      scratchpad = { markdown: renderMarkdown(activity), generatedAt: new Date().toISOString(), model: null, digest };
+      scratchpad = deterministic();
     } else {
-      try {
-        const markdown = await this.summariser(this.cfg.llm, activity, date);
-        scratchpad = { markdown, generatedAt: new Date().toISOString(), model: this.cfg.llm.model, digest };
-      } catch (err) {
+      // Two attempts: a retry after a failed call, or a shortening pass after an
+      // over-budget draft.
+      let draft: string | undefined;
+      let lastError: unknown;
+      while (attempts < 2) {
+        attempts++;
+        try {
+          draft = await this.summariser(this.cfg.llm, { activity, today: date, maxChars, overBudgetDraft: draft });
+          lastError = undefined;
+        } catch (err) {
+          lastError = err;
+          this.log("summarise attempt failed", { attempt: attempts, error: String(err) });
+          continue;
+        }
+        if (draft.length <= maxChars) break;
+      }
+
+      const overlaps = draft ? extractOverlaps(draft) : null;
+      if (draft && draft.length <= maxChars && !lastError) {
+        scratchpad = { ...base, markdown: draft, model: this.cfg.llm.model, mode: "llm", chars: draft.length };
+      } else if (overlaps) {
+        // The model's judgement on overlaps is the valuable part; keep it even
+        // when its full draft didn't fit.
+        const markdown = renderHybrid(activity, overlaps, maxChars, date);
         scratchpad = {
-          markdown: renderMarkdown(activity),
-          generatedAt: new Date().toISOString(),
-          model: null,
-          digest,
-          error: String(err),
+          ...base,
+          markdown,
+          model: this.cfg.llm.model,
+          mode: "hybrid",
+          chars: markdown.length,
+          error: lastError ? String(lastError) : `LLM output ${draft!.length} chars exceeded budget ${maxChars}`,
         };
+      } else {
+        scratchpad = deterministic(lastError ? String(lastError) : `LLM output ${draft?.length} chars exceeded budget ${maxChars}`);
       }
     }
     await this.store.setScratchpad(scratchpad);
     this.log("scratchpad rebuilt", {
       users: activity.length,
-      model: scratchpad.model,
+      projects: activity.reduce((n, u) => n + u.projects.length, 0),
+      mode: scratchpad.mode,
+      chars: scratchpad.chars,
+      attempts,
       ms: Date.now() - started,
       ...(scratchpad.error ? { error: scratchpad.error } : {}),
     });

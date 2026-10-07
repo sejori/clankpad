@@ -35,7 +35,13 @@ export interface Scratchpad {
   generatedAt: string;
   /** Model that wrote the summary, or null when the deterministic fallback was used. */
   model: string | null;
+  /**
+   * llm: written by the model. hybrid: the model's overlaps section over a
+   * deterministic body (model output was over budget). deterministic: no model.
+   */
+  mode: "llm" | "hybrid" | "deterministic";
   /** Hash of the activity the scratchpad was built from. */
   digest: string;
+  chars: number;
   error?: string;
 }

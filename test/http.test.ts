@@ -9,7 +9,7 @@ import { MemoryStore } from "../src/store.ts";
 
 const cfg = { ...loadConfig(), identityMode: "tailscale" as const, rebuildDebounceMs: 1, rebuildIntervalMs: 0, llm: { ...loadConfig().llm, apiKey: undefined } };
 const store = new MemoryStore();
-const agg = new Aggregator(store, cfg, () => {});
+const agg = new Aggregator(store, cfg, { log: () => {} });
 const server = createHttpServer(cfg, store, new Service(store, agg, cfg));
 let base = "";
 

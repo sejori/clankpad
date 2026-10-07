@@ -1,5 +1,4 @@
-# Example manifests. The canonical Euler deployment lives in
-# doublewordai/internal under euler/clankpad/ — keep the two in step.
+# Example manifests; adapt to your cluster's GitOps layout.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: clankpad

@@ -42,8 +42,8 @@ similar area, the same ticket or initiative, or the same system or incident. Ign
 
 If you find a real overlap, tell the user briefly before starting, for example:
 
-> Heads up: **rushil@example.com** has been working on *onwards first-token
-> failover* (control-layer, last seen 2026-10-06). You should speak to Rushil
+> Heads up: **rushil@example.com** has been working on *gateway first-token
+> failover* (acme/gateway, last seen 2026-10-06). You should speak to Rushil
 > before changing the retry path.
 
 Then continue unless the user wants to stop. If nothing overlaps, say nothing.

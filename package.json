@@ -8,11 +8,12 @@
   },
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
     "dev": "CLANKPAD_STORE=memory CLANKPAD_IDENTITY_MODE=dev node --watch --experimental-strip-types src/index.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --experimental-strip-types --test 'test/**/*.test.ts'"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --experimental-strip-types --test 'test/**/*.test.ts'",
+    "sim": "node --experimental-strip-types sim/simulate.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
