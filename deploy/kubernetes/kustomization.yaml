@@ -1,0 +1,14 @@
+# Example manifests. The canonical Euler deployment lives in
+# doublewordai/internal under euler/clankpad/ — keep the two in step.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: clankpad
+resources:
+  - namespace.yaml
+  - redis.yaml
+  - clankpad.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+images:
+  - name: ghcr.io/sejori/clankpad
+    newTag: main

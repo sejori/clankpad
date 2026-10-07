@@ -1,0 +1,15 @@
+# Exposes https://clankpad.<tailnet>.ts.net via the Tailscale operator. The
+# operator's proxy sets Tailscale-User-Login for user-owned devices, which is
+# how clankpad identifies callers.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: clankpad
+spec:
+  ingressClassName: tailscale
+  defaultBackend:
+    service:
+      name: clankpad
+      port: {name: http}
+  tls:
+    - hosts: [clankpad]
