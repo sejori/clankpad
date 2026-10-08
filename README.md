@@ -151,7 +151,10 @@ clankpad through a public ingress.
 ## Agent skill
 
 `skill/clankpad/SKILL.md` is a template Claude Code skill. Copy it into a
-workspace's `.claude/skills/clankpad/`. To use MCP directly instead:
+workspace's `.claude/skills/clankpad/`, replacing `<tailnet>` and
+`<agent-channel>`. When it finds an overlap and the agent has Slack access, it
+looks for a coordination thread between the two people in the agent channel
+from the last 24 hours, or starts one that @-mentions the teammate. To use MCP directly instead:
 
 ```bash
 claude mcp add --transport http clankpad https://clankpad.<tailnet>.ts.net/mcp
