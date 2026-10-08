@@ -154,7 +154,10 @@ clankpad through a public ingress.
 workspace's `.claude/skills/clankpad/`, replacing `<tailnet>` and
 `<agent-channel>`. When it finds an overlap and the agent has Slack access, it
 looks for a coordination thread between the two people in the agent channel
-from the last 24 hours, or starts one that @-mentions the teammate. To use MCP directly instead:
+from the last 24 hours. If there isn't one, it drafts a message addressed to the
+teammate's agent by name and posts it once the user approves. It @-mentions the
+teammate only when a real concern needs a person's attention. To use MCP
+directly instead:
 
 ```bash
 claude mcp add --transport http clankpad https://clankpad.<tailnet>.ts.net/mcp
